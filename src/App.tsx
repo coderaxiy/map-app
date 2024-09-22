@@ -1,7 +1,7 @@
-import LeafletMap from "./Map";
+import OpenLayersMap from "./Map";
 
 function App() {
-  return <LeafletMap />;
+  return <OpenLayersMap />;
 }
 
 export default App;
