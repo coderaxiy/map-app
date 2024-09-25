@@ -27,19 +27,32 @@ export default function OpenLayersMap() {
   const coords = data.coordinates.map((v) => ({ id: uuid(), ...v }));
   const [coordinates, setCoordinates] = useState<coordinateTypes[]>(coords);
   const [selected, setSelected] = useState<coordinateTypes | null>(null);
-  const [openModal, setOpenModal] = useState<boolean>(false)
+  const [openModal, setOpenModal] = useState<boolean>(false);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    const savedData = localStorage.getItem("coordinates");
+    if (savedData) {
+      setCoordinates(JSON.parse(savedData));
+    } else {
+      localStorage.setItem("coordinates", JSON.stringify(coordinates));
+    }
+  }, []);
+
   function outsideDetector(event: MouseEvent) {
+    // Check if the click is inside the popup or the modal
     if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
       const markerElement = (event.target as HTMLElement).closest('.ol-marker');
-      if (!markerElement) {
+      const modalElement = document.querySelector('.ant-modal-content'); // Modal content
+  
+      // Check if the click is outside the marker and modal content
+      if (!markerElement && !modalElement?.contains(event.target as Node)) {
         setSelected(null);
       }
     }
   }
-
+  
   useEffect(() => {
     if (selected) {
       document.addEventListener('mousedown', outsideDetector);
@@ -48,6 +61,7 @@ export default function OpenLayersMap() {
       };
     }
   }, [selected]);
+  
 
   const activeIcon = new Icon({
     src: marker,
@@ -62,16 +76,6 @@ export default function OpenLayersMap() {
     scale: 1,
   });
 
-
-  useEffect(() => {
-    const savedData = localStorage.getItem("coordinates");
-    if (savedData) {
-      setCoordinates(JSON.parse(savedData));
-    } else {
-      localStorage.setItem("coordinates", JSON.stringify(coordinates));
-    }
-  }, [])
-
   useEffect(() => {
     const initialMap = new Map({
       target: mapRef.current!,
@@ -85,38 +89,33 @@ export default function OpenLayersMap() {
         zoom: 6,
       }),
     });
-    
+  
     const popup = new Overlay({
       element: popupRef.current!,
       autoPan: true,
     });
     initialMap.addOverlay(popup);
-
+  
     const vectorSource = new VectorSource();
     coordinates.forEach((item) => {
       const feature = new Feature({
         geometry: new Point(fromLonLat([item.longitude, item.latitude])),
         item,
       });
-
+  
       feature.setStyle(
         new Style({
-          image: item.status ? activeIcon : inActiveIcon
+          image: item.status ? activeIcon : inActiveIcon,
         })
       );
-
-      feature?.getStyle()?.getImage()?.getAnchor();
-      const element = feature.getGeometry();
-      element?.set('className', 'ol-marker');
-
       vectorSource.addFeature(feature);
     });
-
+  
     const vectorLayer = new VectorLayer({
       source: vectorSource,
     });
     initialMap.addLayer(vectorLayer);
-
+  
     initialMap.on("click", function (event) {
       initialMap.forEachFeatureAtPixel(event.pixel, function (feature) {
         const item = feature.get("item") as coordinateTypes;
@@ -124,12 +123,14 @@ export default function OpenLayersMap() {
         popup.setPosition(event.coordinate);
       });
     });
-
+  
     return () => initialMap.setTarget(undefined);
   }, [coordinates]);
 
-  const closeModal = () => setOpenModal(false);
-
+  const closeModal = () => {
+    setSelected(null);
+    setOpenModal(false);
+  };
   return (
     <>
       <div
@@ -154,25 +155,27 @@ export default function OpenLayersMap() {
             </ul>
           )}
           {selected && (
-            <Button
-              className="mt-2"
-              htmlType="button"
-              type="primary"
-              onClick={() => setOpenModal(true)}
-            >
-              Edit
-            </Button>
+           <Button
+           className="mt-2"
+           htmlType="button"
+           type="primary"
+           onClick={() => setOpenModal(true)}
+         >
+           Edit
+         </Button>
           )}
         </div>
       </div>
 
       <Modal open={openModal} onCancel={closeModal} footer={null}>
+        {/* {selected && ( */}
           <DetailForm
             item={selected}
             coordinates={coordinates}
             setCoordinates={setCoordinates}
             closeModal={closeModal}
           />
+        {/* )} */}
       </Modal>
     </>
   );
